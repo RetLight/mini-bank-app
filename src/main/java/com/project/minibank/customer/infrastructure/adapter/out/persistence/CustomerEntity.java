@@ -8,35 +8,33 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "cliente")
+@Table(name = "customer")
 public class CustomerEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "tipo_documento")
+    @Column(name = "document_type")
     private String documentType;
 
-    @Column(name = "numero_documento")
+    @Column(name = "document_number")
     private String documentNumber;
 
-    @Column(name = "nombres")
+    @Column(name = "first_names")
     private String firstNames;
 
-    @Column(name = "apellidos")
+    @Column(name = "last_names")
     private String lastNames;
 
     private String email;
 
-    @Column(name = "telefono")
     private String phone;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "estado")
     private CustomerStatus status;
 
-    @Column(name = "fecha_registro")
+    @Column(name = "registered_at")
     private LocalDateTime registeredAt;
 
     @OneToMany(mappedBy = "customer")

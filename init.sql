@@ -1,96 +1,90 @@
-CREATE TABLE cliente
+CREATE TABLE customer
 (
-  id INT NOT NULL AUTO_INCREMENT,
-  tipo_documento VARCHAR(10) NOT NULL,
-  numero_documento VARCHAR(20) NOT NULL,
-  nombres VARCHAR(100) NOT NULL,
-  apellidos VARCHAR(100) NOT NULL,
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  document_type VARCHAR(10) NOT NULL,
+  document_number VARCHAR(20) NOT NULL,
+  first_names VARCHAR(100) NOT NULL,
+  last_names VARCHAR(100) NOT NULL,
   email VARCHAR(150) NOT NULL,
-  telefono VARCHAR(20),
-  estado VARCHAR(20) NOT NULL,
-  fecha_registro TIMESTAMP NOT NULL,
-  PRIMARY KEY (id),
-  UNIQUE (numero_documento),
+  phone VARCHAR(20),
+  status VARCHAR(20) NOT NULL,
+  registered_at TIMESTAMP NOT NULL,
+  UNIQUE (document_number),
   UNIQUE (email)
 );
 
-CREATE TABLE usuario
+CREATE TABLE app_user
 (
-  id INT NOT NULL AUTO_INCREMENT,
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(50) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  rol VARCHAR(20) NOT NULL,
-  intentos_fallidos INT NOT NULL,
-  bloqueado BOOLEAN NOT NULL,
-  ultimo_login TIMESTAMP,
-  cliente_id INT NOT NULL,
-  PRIMARY KEY (id),
-  FOREIGN KEY (cliente_id) REFERENCES cliente(id),
-  UNIQUE (cliente_id),
+  role VARCHAR(20) NOT NULL,
+  failed_attempts INT NOT NULL,
+  blocked BOOLEAN NOT NULL,
+  last_login TIMESTAMP,
+  customer_id INT NOT NULL,
+  FOREIGN KEY (customer_id) REFERENCES customer(id),
+  UNIQUE (customer_id),
   UNIQUE (username)
 );
 
-CREATE TABLE cuenta
+CREATE TABLE account
 (
-  id INT NOT NULL AUTO_INCREMENT,
-  numero_cuenta VARCHAR(20) NOT NULL,
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  account_number VARCHAR(20) NOT NULL,
   cci VARCHAR(20) NOT NULL,
-  tipo VARCHAR(20) NOT NULL,
-  moneda VARCHAR(3) NOT NULL,
-  saldo DECIMAL(15,2) NOT NULL,
-  estado VARCHAR(20) NOT NULL,
-  fecha_apertura TIMESTAMP NOT NULL,
-  cliente_id INT NOT NULL,
-  PRIMARY KEY (id),
-  FOREIGN KEY (cliente_id) REFERENCES cliente(id),
-  UNIQUE (numero_cuenta),
+  type VARCHAR(20) NOT NULL,
+  currency VARCHAR(3) NOT NULL,
+  balance DECIMAL(15,2) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  opened_at TIMESTAMP NOT NULL,
+  customer_id INT NOT NULL,
+  FOREIGN KEY (customer_id) REFERENCES customer(id),
+  UNIQUE (account_number),
   UNIQUE (cci)
 );
 
-CREATE TABLE transferencia
+CREATE TABLE transfer
 (
-  id INT NOT NULL AUTO_INCREMENT,
-  monto DECIMAL(15,2) NOT NULL,
-  moneda VARCHAR(3) NOT NULL,
-  estado VARCHAR(20) NOT NULL,
-  motivo_rechazo VARCHAR(255),
-  fecha_solicitud TIMESTAMP NOT NULL,
-  fecha_proceso TIMESTAMP,
-  tipo VARCHAR(20) NOT NULL,
-  cci_destino VARCHAR(20) NOT NULL,
-  banco_destino VARCHAR(50) NOT NULL,
-  titular_destino VARCHAR(100) NOT NULL,
-  cuenta_origen_id INT NOT NULL,
-  cuenta_destino_id INT,
-  PRIMARY KEY (id),
-  FOREIGN KEY (cuenta_origen_id) REFERENCES cuenta(id),
-  FOREIGN KEY (cuenta_destino_id) REFERENCES cuenta(id)
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  amount DECIMAL(15,2) NOT NULL,
+  currency VARCHAR(3) NOT NULL,
+  status VARCHAR(20) NOT NULL,
+  rejection_reason VARCHAR(255),
+  requested_at TIMESTAMP NOT NULL,
+  processed_at TIMESTAMP,
+  type VARCHAR(20) NOT NULL,
+  destination_cci VARCHAR(20) NOT NULL,
+  destination_bank VARCHAR(50) NOT NULL,
+  destination_holder VARCHAR(100) NOT NULL,
+  source_account_id INT NOT NULL,
+  destination_account_id INT,
+  FOREIGN KEY (source_account_id) REFERENCES account(id),
+  FOREIGN KEY (destination_account_id) REFERENCES account(id)
 );
 
-CREATE TABLE movimiento
+CREATE TABLE movement
 (
-  id INT NOT NULL AUTO_INCREMENT,
-  tipo VARCHAR(20) NOT NULL,
-  monto DECIMAL(15,2) NOT NULL,
-  saldo_resultante DECIMAL(15,2) NOT NULL,
-  fecha TIMESTAMP NOT NULL,
-  cuenta_id INT NOT NULL,
-  transferencia_id INT NOT NULL,
-  PRIMARY KEY (id),
-  FOREIGN KEY (cuenta_id) REFERENCES cuenta(id),
-  FOREIGN KEY (transferencia_id) REFERENCES transferencia(id)
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  type VARCHAR(20) NOT NULL,
+  amount DECIMAL(15,2) NOT NULL,
+  resulting_balance DECIMAL(15,2) NOT NULL,
+  occurred_at TIMESTAMP NOT NULL,
+  account_id INT NOT NULL,
+  transfer_id INT,
+  FOREIGN KEY (account_id) REFERENCES account(id),
+  FOREIGN KEY (transfer_id) REFERENCES transfer(id)
 );
 
-CREATE TABLE favoritos
+CREATE TABLE favorite
 (
-  id INT NOT NULL AUTO_INCREMENT,
+  id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   alias VARCHAR(50) NOT NULL,
-  numero_cuenta VARCHAR(20) NOT NULL,
-  banco VARCHAR(50) NOT NULL,
-  titular VARCHAR(100) NOT NULL,
-  cliente_id INT NOT NULL,
-  PRIMARY KEY (id),
-  FOREIGN KEY (cliente_id) REFERENCES cliente(id),
-  UNIQUE (cliente_id, numero_cuenta, banco),
-  UNIQUE (cliente_id, alias)
+  account_number VARCHAR(20) NOT NULL,
+  bank VARCHAR(50) NOT NULL,
+  holder VARCHAR(100) NOT NULL,
+  customer_id INT NOT NULL,
+  FOREIGN KEY (customer_id) REFERENCES customer(id),
+  UNIQUE (customer_id, account_number, bank),
+  UNIQUE (customer_id, alias)
 );

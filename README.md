@@ -17,133 +17,107 @@ El proyecto está hecho con **Spring Boot** y sigue una **arquitectura hexagonal
 
 ## Modelo de datos (ERD)
 
-El script de la base de datos está en [init.sql](init.sql).
+- Tablas: [init.sql](init.sql)
+- Datos de prueba: [test-data.sql](test-data.sql) (borra y vuelve a cargar los datos)
 
 ```mermaid
 erDiagram
-    CLIENTE ||--|| USUARIO : "tiene"
-    CLIENTE ||--o{ CUENTA : "es dueño de"
-    CLIENTE ||--o{ FAVORITOS : "registra"
-    CUENTA ||--o{ MOVIMIENTO : "registra"
-    CUENTA ||--o{ TRANSFERENCIA : "envía (origen)"
-    CUENTA |o--o{ TRANSFERENCIA : "recibe (destino)"
-    TRANSFERENCIA ||--o{ MOVIMIENTO : "genera"
+    CUSTOMER ||--|| APP_USER : "tiene"
+    CUSTOMER ||--o{ ACCOUNT : "es dueño de"
+    CUSTOMER ||--o{ FAVORITE : "registra"
+    ACCOUNT ||--o{ MOVEMENT : "registra"
+    ACCOUNT ||--o{ TRANSFER : "envía (origen)"
+    ACCOUNT |o--o{ TRANSFER : "recibe (destino)"
+    TRANSFER |o--o{ MOVEMENT : "genera"
 
-    CLIENTE {
+    CUSTOMER {
         int id PK
-        varchar tipo_documento
-        varchar numero_documento UK
-        varchar nombres
-        varchar apellidos
+        varchar document_type
+        varchar document_number UK
+        varchar first_names
+        varchar last_names
         varchar email UK
-        varchar telefono
-        varchar estado
-        timestamp fecha_registro
+        varchar phone
+        varchar status
+        timestamp registered_at
     }
 
-    USUARIO {
+    APP_USER {
         int id PK
         varchar username UK
         varchar password_hash
-        varchar rol
-        int intentos_fallidos
-        boolean bloqueado
-        timestamp ultimo_login
-        int cliente_id FK,UK
+        varchar role
+        int failed_attempts
+        boolean blocked
+        timestamp last_login
+        int customer_id FK,UK
     }
 
-    CUENTA {
+    ACCOUNT {
         int id PK
-        varchar numero_cuenta UK
+        varchar account_number UK
         varchar cci UK
-        varchar tipo
-        varchar moneda
-        decimal saldo
-        varchar estado
-        timestamp fecha_apertura
-        int cliente_id FK
+        varchar type
+        varchar currency
+        decimal balance
+        varchar status
+        timestamp opened_at
+        int customer_id FK
     }
 
-    TRANSFERENCIA {
+    TRANSFER {
         int id PK
-        decimal monto
-        varchar moneda
-        varchar estado
-        varchar motivo_rechazo
-        timestamp fecha_solicitud
-        timestamp fecha_proceso
-        varchar tipo
-        varchar cci_destino
-        varchar banco_destino
-        varchar titular_destino
-        int cuenta_origen_id FK
-        int cuenta_destino_id FK
+        decimal amount
+        varchar currency
+        varchar status
+        varchar rejection_reason
+        timestamp requested_at
+        timestamp processed_at
+        varchar type
+        varchar destination_cci
+        varchar destination_bank
+        varchar destination_holder
+        int source_account_id FK
+        int destination_account_id FK
     }
 
-    MOVIMIENTO {
+    MOVEMENT {
         int id PK
-        varchar tipo
-        decimal monto
-        decimal saldo_resultante
-        timestamp fecha
-        int cuenta_id FK
-        int transferencia_id FK
+        varchar type
+        decimal amount
+        decimal resulting_balance
+        timestamp occurred_at
+        int account_id FK
+        int transfer_id FK
     }
 
-    FAVORITOS {
+    FAVORITE {
         int id PK
         varchar alias
-        varchar numero_cuenta
-        varchar banco
-        varchar titular
-        int cliente_id FK
+        varchar account_number
+        varchar bank
+        varchar holder
+        int customer_id FK
     }
 ```
 
-## Casos de uso
+## Casos de uso implementados
 
-### Caso de uso 1: Enviar dinero a otra persona
+Los endpoints `/api/me/...` requieren `Authorization: Bearer <token>`.
 
-**Quién lo usa:** un cliente de MiniBank.
+| Caso de uso | Endpoint | Descripción |
+|---|---|---|
+| Login | `POST /api/auth/login` | Valida usuario y contraseña y devuelve un token JWT. |
+| Agregar favorito | `POST /api/me/favorites` | Guarda una cuenta de destino frecuente con un alias. |
+| Listar favoritos | `GET /api/me/favorites` | Devuelve todos mis favoritos. |
+| Ver favorito | `GET /api/me/favorites/{id}` | Devuelve un favorito por su id. |
+| Buscar favorito por alias | `GET /api/me/favorites/alias/{alias}` | Devuelve un favorito por su alias. |
+| Hacer transferencia | `POST /api/me/transfers` | Envía dinero desde una cuenta mía a otra cuenta de MiniBank o de otro banco. |
+| Ver transferencia | `GET /api/me/transfers/{id}` | Devuelve una transferencia que envié o recibí. |
+| Listar transferencias | `GET /api/me/transfers?accountId=` | Devuelve las transferencias enviadas desde una de mis cuentas. |
+| Ver movimiento | `GET /api/me/movements/{id}` | Devuelve un movimiento de una de mis cuentas. |
+| Listar movimientos | `GET /api/me/movements?accountId=` | Devuelve los ingresos y salidas de una de mis cuentas. |
 
-**Qué quiere lograr:** mandar dinero desde una de sus cuentas a la cuenta de otra persona, sea de MiniBank o de otro banco.
+## Cómo probar
 
-**Cómo sucede:**
-
-1. El cliente entra a la app con su usuario y contraseña.
-2. Elige la cuenta desde la que va a enviar el dinero.
-3. Indica a quién le envía: escoge un beneficiario que ya tiene guardado o escribe los datos de la cuenta destino.
-4. Escribe cuánto quiere enviar.
-5. La app le muestra un resumen de la solicitud para valdiación.
-6. El cliente confirma.
-7. Se le descuenta dinero.
-8. El envío aparece en su lista de movimientos.
-
-**Qué puede salir mal:**
-
-- **No tiene suficiente dinero:** la app le avisa que su saldo no alcanza y no envía nada.
-- **La cuenta destino no existe o está cerrada:** la transferencia se rechaza y se le explica el motivo.
-- **Las monedas no coinciden**: la app se lo indica antes de confirmar.
-
----
-
-### Caso de uso 2: Guardar a alguien como favorito
-
-**Quién lo usa:** un cliente de MiniBank.
-
-**Qué quiere lograr:** guardar los datos de una persona a la que le envía dinero seguido para no escribirlos cada vez.
-
-**Cómo sucede:**
-
-1. El cliente entra a la app.
-2. Va a la sección "Mis beneficiarios" y elige "Agregar favorito".
-3. Escribe los datos de la otra persona: número de cuenta, banco y nombre del titular.
-4. Le pone un nombre corto para reconocerlo fácil, por ejemplo "Mamá" o "Alquiler".
-5. Confirma y el favorito queda guardado.
-6. La próxima vez que quiera transferir, solo lo escoge de su lista.
-
-**Qué puede salir mal:**
-
-- **Faltan datos o están mal escritos:** la app le dice qué debe corregir antes de guardar.
-- **Ya tiene guardada esa misma cuenta:** la app le avisa que ese favorito ya existe.
-- **Repite un nombre corto que ya usó:** la app le pide que ponga otro para no confundirse.
+- Usuarios de [test-data.sql](test-data.sql): `demo/demo123`, `admin/admin123`, `maria/maria123`, `pedro/pedro123` (bloqueado).

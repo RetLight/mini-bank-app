@@ -28,7 +28,7 @@ public class FavoritePersistenceAdapter implements FavoriteRepositoryPort {
     }
 
     @Override
-    public Optional<Favorite> findById(Long favoriteId, Long customerId) {
+    public Optional<Favorite> findById(Long customerId, Long favoriteId) {
         return favoriteJpaRepository.findByIdAndCustomerId(favoriteId, customerId).map(FavoritePersistenceMapper::toDomain);
     }
 

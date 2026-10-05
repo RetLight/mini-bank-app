@@ -9,7 +9,7 @@ public interface FavoriteRepositoryPort {
 
     Favorite save(Favorite favorite);
 
-    Optional<Favorite> findById(Long favoriteId, Long customerId);
+    Optional<Favorite> findById(Long customerId, Long favoriteId);
 
     List<Favorite> findAll(Long customerId);
 

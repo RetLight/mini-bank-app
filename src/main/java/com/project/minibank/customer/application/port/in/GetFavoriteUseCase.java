@@ -6,7 +6,7 @@ import java.util.List;
 
 public interface GetFavoriteUseCase {
 
-    Favorite findById(Long favoriteId, Long customerId);
+    Favorite findById(Long customerId, Long favoriteId);
 
     Favorite findByAlias(Long customerId, String alias);
 

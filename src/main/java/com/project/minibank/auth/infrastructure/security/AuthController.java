@@ -12,22 +12,22 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    public record LoginRequest(String username, String password) {}
-    public record TokenResponse(String token, String tokenType, long expiresIn) {}
+    public record LoginRequestDto(String username, String password) {}
+    public record TokenResponseDto(String token, String tokenType, long expiresIn) {}
 
-    private final AuthenticationManager authenticationManager;
     private final TokenService tokenService;
+    private final AuthenticationManager authenticationManager;
 
-    public AuthController(AuthenticationManager authenticationManager, TokenService tokenService) {
-        this.authenticationManager = authenticationManager;
+    public AuthController(TokenService tokenService, AuthenticationManager authenticationManager) {
         this.tokenService = tokenService;
+        this.authenticationManager = authenticationManager;
     }
 
     @PostMapping("/login")
-    public TokenResponse login(@RequestBody LoginRequest request) {
+    public TokenResponseDto login(@RequestBody LoginRequestDto requestDto) {
         Authentication auth = authenticationManager.authenticate(
-                UsernamePasswordAuthenticationToken.unauthenticated(request.username(), request.password()));
+                UsernamePasswordAuthenticationToken.unauthenticated(requestDto.username(), requestDto.password()));
 
-        return new TokenResponse(tokenService.generate(auth.getName()), "Bearer", tokenService.getExpirationSeconds());
+        return new TokenResponseDto(tokenService.generate(auth), "Bearer", 1800);
     }
 }

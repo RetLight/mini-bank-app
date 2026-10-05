@@ -35,9 +35,9 @@ public class FavoriteService implements AddFavoriteUseCase, GetFavoriteUseCase {
     }
 
     @Override
-    public Favorite findById(Long favoriteId, Long customerId) {
-        return favoriteRepository.findById(favoriteId, customerId)
-                .orElseThrow(() -> new FavoriteNotFoundException(favoriteId, customerId));
+    public Favorite findById(Long customerId, Long favoriteId) {
+        return favoriteRepository.findById(customerId, favoriteId)
+                .orElseThrow(() -> new FavoriteNotFoundException(customerId, favoriteId));
     }
 
     @Override

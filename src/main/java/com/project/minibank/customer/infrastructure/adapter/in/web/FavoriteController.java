@@ -44,7 +44,7 @@ public class FavoriteController {
 
     @GetMapping("/{favoriteId}")
     public FavoriteResponse findById(@AuthenticationPrincipal Jwt jwt, @PathVariable Long favoriteId) {
-        return FavoriteWebMapper.toResponse(getFavoriteUseCase.findById(favoriteId, customerId(jwt)));
+        return FavoriteWebMapper.toResponse(getFavoriteUseCase.findById(customerId(jwt), favoriteId));
     }
 
     @GetMapping("/alias/{alias}")

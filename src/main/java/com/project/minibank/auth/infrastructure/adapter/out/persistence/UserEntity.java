@@ -3,7 +3,7 @@ package com.project.minibank.auth.infrastructure.adapter.out.persistence;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "usuario")
+@Table(name = "app_user")
 public class UserEntity {
 
     @Id
@@ -15,16 +15,14 @@ public class UserEntity {
     @Column(name = "password_hash")
     private String passwordHash;
 
-    @Column(name = "rol")
     private String role;
 
-    @Column(name = "intentos_fallidos")
+    @Column(name = "failed_attempts")
     private int failedAttempts;
 
-    @Column(name = "bloqueado")
     private boolean blocked;
 
-    @Column(name = "cliente_id")
+    @Column(name = "customer_id")
     private Long customerId;
 
     public UserEntity() {

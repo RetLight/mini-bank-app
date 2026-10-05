@@ -3,7 +3,7 @@ package com.project.minibank.customer.infrastructure.adapter.out.persistence;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "favoritos")
+@Table(name = "favorite")
 public class FavoriteEntity {
 
     @Id
@@ -12,17 +12,15 @@ public class FavoriteEntity {
 
     private String alias;
 
-    @Column(name = "numero_cuenta")
+    @Column(name = "account_number")
     private String accountNumber;
 
-    @Column(name = "banco")
     private String bank;
 
-    @Column(name = "titular")
     private String holder;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cliente_id")
+    @JoinColumn(name = "customer_id")
     private CustomerEntity customer;
 
     public FavoriteEntity() {
