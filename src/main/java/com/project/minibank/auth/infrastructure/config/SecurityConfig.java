@@ -1,6 +1,6 @@
-package com.project.minibank.auth.infrastructure.security;
+package com.project.minibank.auth.infrastructure.config;
 
-import com.project.minibank.auth.infrastructure.adapter.out.persistence.UserJpaRepository;
+import com.project.minibank.auth.application.port.out.UserRepositoryPort;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -44,8 +44,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    UserDetailsService users(UserJpaRepository userJpaRepository) {
-        return username -> userJpaRepository.findByUsername(username)
+    UserDetailsService users(UserRepositoryPort userRepository) {
+        return username -> userRepository.findByUsername(username)
                 .map(user -> User.withUsername(user.getUsername())
                         .password(user.getPasswordHash())
                         .roles(user.getRole())

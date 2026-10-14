@@ -62,52 +62,23 @@ public class TransferService implements MakeTransferUseCase, GetTransferUseCase 
         destination.ifPresent(account2 -> account2.increase(cmd.amount()));
 
         LocalDateTime now = LocalDateTime.now();
-        Transfer transfer = new Transfer(
-                null,
+        Transfer saved = transferRepositoryPort.save(Transfer.create(
+                source,
+                destination.orElse(null),
                 cmd.amount(),
-                source.getCurrency(),
-                "COMPLETED",
-                null,
-                now,
-                now,
-                destination.isPresent()?"INTERNAL":"EXTERNAL",
                 cmd.destinationCci(),
                 cmd.destinationBank(),
                 cmd.destinationHolder(),
-                cmd.sourceAccountId(),
-                destination.isPresent()? destination.get().getId() : null
-        );
+                now
+        ));
 
-        Transfer saved = transferRepositoryPort.save(transfer);
-
-        Movement movement = new Movement(
-                null,
-                "DECREASE",
-                transfer.getAmount(),
-                source.getBalance(),
-                now,
-                source.getId(),
-                saved.getId()
-        );
-
-        movementRepositoryPort.save(movement);
+        movementRepositoryPort.save(Movement.debit(source, cmd.amount(), saved.getId(), now));
         accountRepositoryPort.saveBalance(source);
 
-        Account accountDestination = null;
-        if(destination.isPresent()){
-            accountDestination = destination.get();
-            accountDestination = accountRepositoryPort.saveBalance(accountDestination);
-
-            movementRepositoryPort.save(new Movement(
-                    null,
-                    "INCREASE",
-                    movement.getAmount(),
-                    accountDestination.getBalance(),
-                    now,
-                    accountDestination.getId(),
-                    saved.getId()
-            ));
-        }
+        destination.ifPresent(account -> {
+            Account savedDestination = accountRepositoryPort.saveBalance(account);
+            movementRepositoryPort.save(Movement.credit(savedDestination, cmd.amount(), saved.getId(), now));
+        });
 
         return saved;
     }

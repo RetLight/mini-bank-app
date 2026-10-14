@@ -12,14 +12,14 @@ public class Transfer {
     private final String rejectionReason;
     private final LocalDateTime requestedAt;
     private final LocalDateTime processedAt;
-    private final String type;
+    private final TransferType type;
     private final String destinationCci;
     private final String destinationBank;
     private final String destinationHolder;
     private final Long sourceAccountId;
     private final Long destinationAccountId;
 
-    public Transfer(Long id, BigDecimal amount, String currency, String status, String rejectionReason, LocalDateTime requestedAt, LocalDateTime processedAt, String type, String destinationCci, String destinationBank, String destinationHolder, Long sourceAccountId, Long destinationAccountId) {
+    public Transfer(Long id, BigDecimal amount, String currency, String status, String rejectionReason, LocalDateTime requestedAt, LocalDateTime processedAt, TransferType type, String destinationCci, String destinationBank, String destinationHolder, Long sourceAccountId, Long destinationAccountId) {
         if (amount == null || amount.signum() <= 0) {
             throw new IllegalArgumentException("El monto debe ser mayor a 0");
         }
@@ -50,6 +50,25 @@ public class Transfer {
         this.destinationAccountId = destinationAccountId;
     }
 
+    public static Transfer create(Account source, Account destination, BigDecimal amount, String destinationCci,
+                                  String destinationBank, String destinationHolder, LocalDateTime requestedAt) {
+        return new Transfer(
+                null,
+                amount,
+                source.getCurrency(),
+                "COMPLETED",
+                null,
+                requestedAt,
+                requestedAt,
+                TransferType.forDestination(destination != null),
+                destinationCci,
+                destinationBank,
+                destinationHolder,
+                source.getId(),
+                destination != null ? destination.getId() : null
+        );
+    }
+
     public Long getId() {
         return id;
     }
@@ -78,7 +97,7 @@ public class Transfer {
         return processedAt;
     }
 
-    public String getType() {
+    public TransferType getType() {
         return type;
     }
 

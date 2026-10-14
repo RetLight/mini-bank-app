@@ -3,6 +3,7 @@ package com.project.minibank.movement.application.service;
 import com.project.minibank.movement.application.port.out.MovementRepositoryPort;
 import com.project.minibank.movement.domain.exception.MovementNotFoundException;
 import com.project.minibank.movement.domain.model.Movement;
+import com.project.minibank.movement.domain.model.MovementType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -37,7 +38,7 @@ public class MovementServiceTest {
 
     @Test
     void shouldReturnMovementIfExists() {
-        Movement movement = new Movement(5L, "DECREASE", new BigDecimal("100.00"), new BigDecimal("900.00"),
+        Movement movement = new Movement(5L, MovementType.DECREASE, new BigDecimal("100.00"), new BigDecimal("900.00"),
                 LocalDateTime.now(), 1L, 1L);
         when(movementRepositoryPort.findById(10L, 5L))
                 .thenReturn(Optional.of(movement));
@@ -45,13 +46,13 @@ public class MovementServiceTest {
         Movement valueReturned = movementService.findById(10L, 5L);
 
         assertEquals(5L, valueReturned.getId());
-        assertEquals("DECREASE", valueReturned.getType());
+        assertEquals(MovementType.DECREASE, valueReturned.getType());
     }
 
     @Test
     void shouldReturnMovementsOfAccount() {
         when(movementRepositoryPort.findAllByAccount(10L, 1L))
-                .thenReturn(List.of(new Movement(5L, "DECREASE", new BigDecimal("100.00"), new BigDecimal("900.00"),
+                .thenReturn(List.of(new Movement(5L, MovementType.DECREASE, new BigDecimal("100.00"), new BigDecimal("900.00"),
                         LocalDateTime.now(), 1L, 1L)));
 
         List<Movement> valueReturned = movementService.findAllByAccount(10L, 1L);

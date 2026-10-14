@@ -1,5 +1,6 @@
 package com.project.minibank.movement.infrastructure.adapter.out.persistence;
 
+import com.project.minibank.movement.domain.model.TransferType;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -28,7 +29,8 @@ public class TransferEntity {
     @Column(name = "processed_at")
     private LocalDateTime processedAt;
 
-    private String type;
+    @Enumerated(EnumType.STRING)
+    private TransferType type;
 
     @Column(name = "destination_cci")
     private String destinationCci;
@@ -49,7 +51,7 @@ public class TransferEntity {
     }
 
     public TransferEntity(Long id, BigDecimal amount, String currency, String status, String rejectionReason,
-                          LocalDateTime requestedAt, LocalDateTime processedAt, String type, String destinationCci,
+                          LocalDateTime requestedAt, LocalDateTime processedAt, TransferType type, String destinationCci,
                           String destinationBank, String destinationHolder, Long sourceAccountId,
                           Long destinationAccountId) {
         this.id = id;
@@ -95,7 +97,7 @@ public class TransferEntity {
         return processedAt;
     }
 
-    public String getType() {
+    public TransferType getType() {
         return type;
     }
 

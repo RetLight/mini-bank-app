@@ -12,7 +12,7 @@ final class MovementWebMapper {
     static MovementResponse toResponse(Movement movement) {
         return new MovementResponse(
                 movement.getId(),
-                movement.getType(),
+                movement.getType().name(),
                 movement.getAmount(),
                 movement.getResultingBalance(),
                 movement.getOccurredAt(),

@@ -6,15 +6,15 @@ import java.util.Objects;
 
 public class Movement {
     private final Long id;
-    private final String type;
+    private final MovementType type;
     private final BigDecimal amount;
     private final BigDecimal resultingBalance;
     private final LocalDateTime occurredAt;
     private final Long accountId;
     private final Long transferId;
 
-    public Movement(Long id, String type, BigDecimal amount, BigDecimal resultingBalance, LocalDateTime occurredAt, Long accountId, Long transferId) {
-        if (type == null || type.isBlank()) {
+    public Movement(Long id, MovementType type, BigDecimal amount, BigDecimal resultingBalance, LocalDateTime occurredAt, Long accountId, Long transferId) {
+        if (type == null) {
             throw new IllegalArgumentException("El tipo de movimiento es obligatorio");
         }
         if (amount == null || amount.signum() <= 0) {
@@ -32,11 +32,19 @@ public class Movement {
         this.transferId = transferId;
     }
 
+    public static Movement debit(Account account, BigDecimal amount, Long transferId, LocalDateTime occurredAt) {
+        return new Movement(null, MovementType.DECREASE, amount, account.getBalance(), occurredAt, account.getId(), transferId);
+    }
+
+    public static Movement credit(Account account, BigDecimal amount, Long transferId, LocalDateTime occurredAt) {
+        return new Movement(null, MovementType.INCREASE, amount, account.getBalance(), occurredAt, account.getId(), transferId);
+    }
+
     public Long getId() {
         return id;
     }
 
-    public String getType() {
+    public MovementType getType() {
         return type;
     }
 

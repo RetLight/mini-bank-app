@@ -30,7 +30,7 @@ final class TransferWebMapper {
                 transfer.getRejectionReason(),
                 transfer.getRequestedAt(),
                 transfer.getProcessedAt(),
-                transfer.getType(),
+                transfer.getType().name(),
                 transfer.getDestinationCci(),
                 transfer.getDestinationBank(),
                 transfer.getDestinationHolder(),

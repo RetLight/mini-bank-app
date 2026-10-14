@@ -1,4 +1,4 @@
-package com.project.minibank.auth.infrastructure.security;
+package com.project.minibank.auth.infrastructure.config;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import org.springframework.beans.factory.annotation.Value;

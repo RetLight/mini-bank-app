@@ -1,5 +1,6 @@
 package com.project.minibank.movement.infrastructure.adapter.out.persistence;
 
+import com.project.minibank.movement.domain.model.MovementType;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
@@ -13,7 +14,8 @@ public class MovementEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String type;
+    @Enumerated(EnumType.STRING)
+    private MovementType type;
 
     private BigDecimal amount;
 
@@ -32,7 +34,7 @@ public class MovementEntity {
     public MovementEntity() {
     }
 
-    public MovementEntity(Long id, String type, BigDecimal amount, BigDecimal resultingBalance,
+    public MovementEntity(Long id, MovementType type, BigDecimal amount, BigDecimal resultingBalance,
                           LocalDateTime occurredAt, Long accountId, Long transferId) {
         this.id = id;
         this.type = type;
@@ -47,7 +49,7 @@ public class MovementEntity {
         return id;
     }
 
-    public String getType() {
+    public MovementType getType() {
         return type;
     }
 

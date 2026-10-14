@@ -12,6 +12,7 @@ import com.project.minibank.movement.domain.exception.TransferNotFoundException;
 import com.project.minibank.movement.domain.model.Account;
 import com.project.minibank.movement.domain.model.Movement;
 import com.project.minibank.movement.domain.model.Transfer;
+import com.project.minibank.movement.domain.model.TransferType;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -104,7 +105,7 @@ public class TransferServiceTest {
         Transfer valueReturned = transferService.makeTransfer(command(10L, 1L, "100", "00219100000000000002"));
 
         assertEquals(1L, valueReturned.getId());
-        assertEquals("INTERNAL", valueReturned.getType());
+        assertEquals(TransferType.INTERNAL, valueReturned.getType());
         assertEquals(new BigDecimal("900.00"), source.getBalance());
         assertEquals(new BigDecimal("600.00"), destination.getBalance());
         verify(transferRepositoryPort, times(1)).save(any(Transfer.class));
