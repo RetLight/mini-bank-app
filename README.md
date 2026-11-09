@@ -1,50 +1,117 @@
-# Mini-Bank-App: rama `microservicios`
+# MiniBank: rama `microservicios`
 
-## ¿Qué es MiniBank?
+## Descripción
 
-MiniBank es un banco digital pequeño. Permite que una persona se registre como cliente, abra sus cuentas y maneje su dinero desde la aplicación, sin ir a una agencia.
+MiniBank es un banco digital pequeño, hecho como proyecto de práctica de **Spring Boot**. Un cliente se registra, inicia sesión y, desde la app, consulta su dinero, transfiere y guarda las cuentas a las que paga seguido.
 
-Con MiniBank un cliente puede:
+Qué puede hacer un cliente:
 
-- **Registrarse** con su documento de identidad, nombre, correo y teléfono.
-- **Ingresar a la app** con su usuario y contraseña. Si se equivoca varias veces seguidas, su acceso se bloquea para protegerlo.
-- **Tener una o varias cuentas** en soles o en dólares, cada una con su número de cuenta y su CCI.
-- **Transferir dinero** a otras cuentas de MiniBank o de otros bancos.
-- **Guardar beneficiarios**, es decir, las cuentas a las que envía dinero seguido, para no escribir los datos cada vez.
-- **Ver sus movimientos**: cada ingreso y cada salida de dinero queda registrado con el saldo que quedó después.
+- **Registrarse** con su documento de identidad, nombres, correo, teléfono, usuario y contraseña. Recibe un token JWT y queda con sesión iniciada.
+- **Iniciar sesión** con usuario y contraseña. Un usuario bloqueado no puede entrar (403).
+- **Transferir dinero** desde una de sus cuentas, en soles o dólares, a un CCI de MiniBank (transferencia interna) o de otro banco (externa).
+- **Consultar sus transferencias y movimientos**: cada ingreso y cada salida queda registrado con el saldo resultante.
+- **Gestionar sus favoritos** (alta, consulta por id o alias, edición y baja): las cuentas a las que transfiere seguido. Solo ve y toca los suyos.
 
-El proyecto está hecho con **Spring Boot** y sigue una **arquitectura hexagonal**. En esta rama, `microservicios`, el monolito se divide en tres servicios con un API Gateway y un Config Server delante.
+Un **administrador** puede, además, listar todos los clientes con su estado.
+
+Las cuentas de prueba vienen en los datos semilla del perfil `dev`; la API no abre cuentas nuevas.
+
+Esta rama divide el monolito original en **tres microservicios** con **arquitectura hexagonal**, más un **API Gateway** como única puerta de entrada y un **Config Server** que reparte la configuración. Cada servicio tiene su propia base de datos y se comunican entre ellos con **OpenFeign**, protegido con **Resilience4j**.
 
 ## Arquitectura
 
-```text
-                        Cliente (Postman, curl, front)
-                                   │  solo habla con :8080
-                                   ▼
-                     api-gateway :8080  ── rutas, X-Request-Id, Bearer obligatorio, CORS
-            ┌──────────────────────┼───────────────────────┐
-            ▼                      ▼                       ▼
-   auth-service :8081    customer-service :8082    account-service :8083
-   usuarios, login,      clientes, favoritos,      cuentas, transferencias,
-   registro, firma JWT   /admin/customers          movimientos
-            │   ▲               │   ▲                      │
-            │   └── Feign ──────┘   │   GET /users/me (Retry + Circuit Breaker + fallback)
-            └────── Feign ──────────┘   POST /internal/customers (registro, token de servicio)
-            ▼                      ▼                       ▼
-         auth_db              customer_db              account_db        (un MySQL, una base por servicio)
+```mermaid
+flowchart TB
+    client["Cliente<br/>Postman · curl · front"]
 
-   config-server :8888 ── sirve config-repo/ a los cuatro de arriba al arrancar
+    subgraph edge["Entrada"]
+        gw["<b>api-gateway</b> :8080<br/>rutas · X-Request-Id · exige Bearer · CORS"]
+    end
+
+    subgraph services["Microservicios (hexagonales, cada uno valida el JWT)"]
+        auth["<b>auth-service</b> :8081<br/>registro · login · firma JWT<br/>/users/me"]
+        customer["<b>customer-service</b> :8082<br/>clientes · favoritos<br/>/admin/customers"]
+        account["<b>account-service</b> :8083<br/>transferencias · movimientos"]
+    end
+
+    subgraph data["MySQL (una base por servicio)"]
+        authdb[("auth_db")]
+        customerdb[("customer_db")]
+        accountdb[("account_db")]
+    end
+
+    config["<b>config-server</b> :8888<br/>sirve config-repo/"]
+
+    client -->|"HTTP + Bearer"| gw
+    gw -->|"/auth/**"| auth
+    gw -->|"/favorites/** · /admin/customers/**"| customer
+    gw -->|"/transfers/** · /movements/**"| account
+
+    auth -. "Feign: POST /internal/customers<br/>(registro, token SERVICE)" .-> customer
+    customer -. "Feign: GET /users/me<br/>Retry + Circuit Breaker + fallback" .-> auth
+
+    auth --- authdb
+    customer --- customerdb
+    account --- accountdb
+
+    config -. "configuración al arrancar" .-> gw & auth & customer & account
 ```
+
+- Las flechas continuas son el tráfico del cliente; **todo** entra por el gateway (`:8080`).
+- Las punteadas son llamadas directas entre servicios (Feign), que **no** pasan por el gateway.
+- `/internal/**` no tiene ruta en el gateway: un cliente nunca puede llamarlo.
 
 | Proyecto | Puerto | Base de datos | Qué hace |
 |---|---|---|---|
 | [`api-gateway`](api-gateway/) | 8080 | — | punto único de entrada; enruta sin reescribir paths |
 | [`auth-service`](auth-service/) | 8081 | `auth_db` | registro, login, firma del JWT, `GET /users/me` |
 | [`customer-service`](customer-service/) | 8082 | `customer_db` | clientes, CRUD de favoritos, `/admin/customers` |
-| [`account-service`](account-service/) | 8083 | `account_db` | cuentas, transferencias y movimientos |
+| [`account-service`](account-service/) | 8083 | `account_db` | transferencias y movimientos |
 | [`config-server`](config-server/) | 8888 | — | configuración de todos desde [`config-repo/`](config-repo/) |
 
-No hay `pom.xml` padre ni código compartido: cada proyecto lleva su propia copia de lo común en el paquete `common` (errores, JWT, logs de llamadas), como en TaskHub. Versiones: **Spring Boot 4.0.9**, **Spring Cloud 2025.1.4**, **Resilience4j 2.4.0** y **JJWT 0.12.6**. Boot 4.1 no tiene todavía un Spring Cloud estable.
+Cada servicio sigue la misma estructura hexagonal: `domain` (modelo y reglas, sin Spring), `application` (casos de uso con puertos `port.in` / `port.out`) e `infrastructure` (controladores, JPA, Feign, seguridad). `ArchitectureTest` (ArchUnit) hace cumplir esas fronteras.
+
+No hay `pom.xml` padre ni código compartido: cada proyecto lleva su propia copia de lo común en el paquete `common` (errores, JWT, logs de llamadas), como en TaskHub. Versiones: **Java 21**, **Spring Boot 4.0.9**, **Spring Cloud 2025.1.4**, **Resilience4j 2.4.0**, **JJWT 0.12.6**, **Flyway** y **MySQL 8**. Boot 4.1 no tiene todavía un Spring Cloud estable.
+
+## APIs expuestas
+
+Todas por el gateway: `http://localhost:8080`. Salvo login y registro, todas necesitan `Authorization: Bearer <token>`.
+
+| Método | Ruta | Acceso | Servicio | Descripción | Respuestas |
+|---|---|---|---|---|---|
+| POST | `/auth/register` | público | auth (+ customer) | Crea el cliente y su usuario; devuelve un token | 201 · 400 · 409 · 503 |
+| POST | `/auth/login` | público | auth | Inicia sesión; devuelve un token | 200 · 400 · 401 · 403 |
+| GET | `/favorites` | cliente | customer | Lista mis favoritos | 200 · 401 |
+| POST | `/favorites` | cliente | customer (+ auth) | Crea un favorito; verifica el usuario con auth-service | 201 · 400 · 403 · 404 · 422 |
+| GET | `/favorites/{id}` | dueño | customer | Detalle de un favorito | 200 · 404 |
+| GET | `/favorites/alias/{alias}` | dueño | customer | Busca un favorito por alias | 200 · 404 |
+| PUT | `/favorites/{id}` | dueño | customer | Modifica un favorito | 200 · 400 · 404 · 422 |
+| DELETE | `/favorites/{id}` | dueño | customer | Borra un favorito | 204 · 404 |
+| GET | `/admin/customers` | `ADMIN` | customer | Todos los clientes con su estado | 200 · 403 |
+| POST | `/transfers` | dueño de la cuenta | account | Transfiere desde una cuenta propia a un CCI | 201 · 400 · 404 · 422 |
+| GET | `/transfers/{id}` | dueño | account | Detalle de una transferencia | 200 · 404 |
+| GET | `/transfers?accountId={id}` | dueño | account | Transferencias de una cuenta | 200 · 404 |
+| GET | `/movements/{id}` | dueño | account | Detalle de un movimiento | 200 · 404 |
+| GET | `/movements?accountId={id}` | dueño | account | Movimientos de una cuenta | 200 · 404 |
+
+"Dueño" significa que el recurso debe ser del cliente del token; si es de otro, la respuesta es **404**, sin confirmar que existe. Cualquier ruta protegida sin token devuelve **401** desde el gateway. Significado de los códigos: **400** datos inválidos · **401** sin token o credenciales incorrectas · **403** rol insuficiente o usuario bloqueado · **404** no existe o no es tuyo · **409** documento o correo ya registrados · **422** regla de negocio (saldo insuficiente, monedas distintas, alias repetido...) · **503** auth-service o customer-service no disponible.
+
+**Internas** (no expuestas por el gateway, solo entre servicios):
+
+| Método | Ruta | Servicio | Quién la llama | Acceso |
+|---|---|---|---|---|
+| POST | `/internal/customers` | customer | auth-service, en el registro | rol `SERVICE` (token de servicio de 60 s) |
+| GET | `/users/me` | auth | customer-service, al crear un favorito | token del usuario, reenviado |
+
+Usuarios de prueba (perfil `dev`): `demo/demo123`, `admin/admin123` (rol ADMIN), `maria/maria123`, `pedro/pedro123` (bloqueado).
+
+```bash
+TOKEN=$(curl -s -X POST localhost:8080/auth/login -H 'Content-Type: application/json' \
+  -d '{"username":"demo","password":"demo123"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
+curl localhost:8080/favorites -H "Authorization: Bearer $TOKEN"
+```
+
+La colección [sc/minibank.postman_collection.json](sc/minibank.postman_collection.json) recorre el flujo completo por el gateway.
 
 ## Seguridad
 
@@ -59,38 +126,7 @@ No hay `pom.xml` padre ni código compartido: cada proyecto lleva su propia copi
 
 Contrapartidas conocidas: con un secreto compartido, quien valida también podría firmar (con RSA, solo `auth-service` tendría la clave privada), y un token sigue valiendo hasta que caduca.
 
-## Llamadas entre servicios (OpenFeign)
-
-| Quién llama | A quién | Cuándo | Si falla |
-|---|---|---|---|
-| auth-service | customer-service `POST /internal/customers` | registro: crea el cliente antes que el usuario, con un token de servicio de 60 s (rol `SERVICE`) | 409 si el documento o el email ya existen; cualquier otro fallo, 503, y no se crea el usuario |
-| customer-service | auth-service `GET /users/me` | crear un favorito: ¿el usuario sigue activo? Reenvía el token del usuario | ver resiliencia |
-
-Las llamadas van directas al servicio, sin pasar por el gateway, y llevan `X-Request-Id` (el de la petición original) y `X-Caller-Service` (quién llama). Cada salto deja una línea de log en los **dos** lados; con el id se sigue una petición de punta a punta:
-
-```text
-api-gateway      | POST /favorites -> 201 CREATED en 112 ms [18b95f29-...]
-customer-service | [customer-service -> auth-service] GET /users/me [req=18b95f29-...]
-auth-service     | [auth-service <- customer-service] GET /users/me -> 200 en 9 ms [req=18b95f29-...]
-customer-service | [customer-service <- auth-service] 200 en 31 ms (GET /users/me)
-```
-
 El gateway borra `X-Caller-Service` de las peticiones externas: un cliente no puede hacerse pasar por un servicio en los logs.
-
-## Resiliencia: auth-service caído
-
-La llamada de `customer-service` a `auth-service` está protegida, por este orden, con **Retry( Circuit Breaker( Feign con timeouts ) )** y un **fallback**. Los parámetros están en `config-repo/customer-service.properties`:
-
-| Pieza | Valor |
-|---|---|
-| Timeout | conexión 1 s, lectura 2 s |
-| Retry | 2 intentos, 300 ms entre ellos; solo para 5xx y fallos de conexión |
-| Circuit Breaker | ventana de 10 llamadas, mínimo 5; abre con el 50 % de fallos, 10 s abierto y 3 llamadas de prueba |
-| Respuestas | activo → favorito verificado · bloqueado → 403 · inexistente → 404 · **sin respuesta → fallback** |
-
-Si `auth-service` está caído, lento, fallando o con el circuito abierto, el fallback acepta el favorito con `"ownerVerified": false`: el token firmado ya prueba la identidad, y rechazar todas las altas mientras auth está caído sería peor. Las lecturas no dependen de `auth-service`. Login y registro, que sí dependen de él, responden 503 desde el gateway. Cada cambio de estado del circuito queda en el log. Límite conocido: nadie reverifica después los favoritos no verificados.
-
-La llamada se hace **fuera de una transacción**, para no retener una conexión de la base mientras se espera a otro servicio.
 
 ## Configuración (Config Server)
 
@@ -214,70 +250,6 @@ scripts/smoke-test.sh                                 # comprobación de punta a
 - Logs: `docker compose logs -f customer-service auth-service`. Para probar la resiliencia: `docker compose stop auth-service` y `scripts/smoke-test.sh auth-caido`.
 - Parar: `docker compose --profile app down` (con `-v` borra también los datos).
 
-### Desde el IDE o con Maven
-
-Requisitos: Java 21 y Docker.
-
-```bash
-cp .env.example .env                 # una sola vez; cambia JWT_SECRET y DB_PASSWORD (y DB_PORT si el 3307 está ocupado)
-docker compose up -d                 # solo MySQL con auth_db, customer_db y account_db (sin --profile app)
-```
-
-Después, en este orden y cada uno en su terminal. Los servicios, con el perfil `dev`:
-
-```bash
-cd config-server && ./mvnw spring-boot:run                                      # 1. :8888, primero
-cd auth-service && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev        # 2. :8081
-cd customer-service && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev    # 3. :8082
-cd account-service && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev     # 4. :8083
-cd api-gateway && ./mvnw spring-boot:run                                        # 5. :8080, el único que usa el cliente
-```
-
-En IntelliJ: *Active profiles* = `dev` en los tres servicios. Sin `dev`, las tablas se crean vacías y el login no encuentra usuarios.
-
-> El script que crea las bases solo corre con el volumen vacío. Si ya tenías el volumen de otra prueba: `docker compose down -v && docker compose up -d` (borra los datos).
-
-Tests: H2 en memoria y servicios falsos, sin Docker ni Config Server. Cada servicio incluye `ArchitectureTest` (ArchUnit), que comprueba la arquitectura hexagonal y las fronteras entre servicios.
-
-```bash
-for s in config-server api-gateway auth-service customer-service account-service; do (cd $s && ./mvnw test); done
-```
-
-## Endpoints (todos por el gateway, `http://localhost:8080`)
-
-| Método | Ruta | Acceso | Servicio | Descripción |
-|---|---|---|---|---|
-| POST | `/auth/register` | público | auth (+ customer) | Crea cliente y usuario; devuelve un token |
-| POST | `/auth/login` | público | auth | Devuelve un token |
-| GET | `/favorites` | cliente | customer | Mis favoritos |
-| POST | `/favorites` | cliente | customer (+ auth) | Crear; verifica el usuario con auth-service |
-| GET | `/favorites/{id}` · `/favorites/alias/{alias}` | dueño | customer | Detalle (404 si es de otro) |
-| PUT | `/favorites/{id}` | dueño | customer | Modificar (404 si es de otro) |
-| DELETE | `/favorites/{id}` | dueño | customer | Borrar (404 si es de otro) |
-| GET | `/admin/customers` | `ADMIN` | customer | Todos los clientes con su estado |
-| POST | `/transfers` | dueño de la cuenta | account | Transferir |
-| GET | `/transfers/{id}` · `/transfers?accountId=` | dueño | account | Transferencias |
-| GET | `/movements/{id}` · `/movements?accountId=` | dueño | account | Movimientos |
-
-Usuarios de prueba (perfil `dev`): `demo/demo123`, `admin/admin123` (rol ADMIN), `maria/maria123`, `pedro/pedro123` (bloqueado).
-
-```bash
-TOKEN=$(curl -s -X POST localhost:8080/auth/login -H 'Content-Type: application/json' \
-  -d '{"username":"demo","password":"demo123"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["token"])')
-curl localhost:8080/favorites -H "Authorization: Bearer $TOKEN"
-```
-
-La colección [sc/minibank.postman_collection.json](sc/minibank.postman_collection.json) recorre el flujo completo por el gateway.
-
-## Comprobación de punta a punta
-
-Con todo levantado, [`scripts/smoke-test.sh`](scripts/smoke-test.sh) recorre la lista por el gateway: Config Server, registro y login, 401 y 403, admin, CRUD de favoritos solo del dueño, Feign y cuentas.
-
-```bash
-scripts/smoke-test.sh                # con todo arriba: 25 comprobaciones
-scripts/smoke-test.sh auth-caido     # después de parar auth-service: login 503, favorito aceptado sin verificar, lecturas OK
-```
-
 ## Pendiente
 
-Pipeline de CI, como en la clase 13 de TaskHub, y healthchecks con Actuator (hoy el healthcheck de cada servicio solo comprueba que su puerto responde HTTP).
+Pipeline de CI como la ultima clase del bootcamp
