@@ -1,0 +1,127 @@
+# MiniBank en Docker. Variables: archivo .env (ver .env.example).
+#
+#   docker compose up -d                              solo MySQL; los servicios se ejecutan desde el IDE o con Maven
+#   docker compose --profile app up -d --build --wait  todo el sistema: MySQL, config-server, 3 servicios y gateway
+#   docker compose --profile app down                 lo para todo (añade -v para borrar también los datos)
+#
+# Con el perfil "app" los servicios arrancan con los perfiles de Spring dev,docker: dev carga los datos de prueba y
+# docker (config-repo/*-docker.properties) cambia localhost por los nombres de servicio de esta red.
+# Orden de arranque por healthchecks: mysql y config-server → auth, customer y account → api-gateway.
+
+# Lo común a los tres servicios de negocio.
+x-business-service: &business-service
+  profiles: ["app"]
+  restart: unless-stopped
+  depends_on:
+    mysql:
+      condition: service_healthy
+    config-server:
+      condition: service_healthy
+  environment:
+    SPRING_PROFILES_ACTIVE: dev,docker
+    CONFIG_SERVER_URL: http://config-server:8888
+    # Secretos: del .env, nunca de config-repo.
+    JWT_SECRET: ${JWT_SECRET:?JWT_SECRET es obligatoria, ver .env.example}
+    DB_USERNAME: ${DB_USERNAME:-root}
+    DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD es obligatoria, ver .env.example}
+
+# Sin Actuator, "sano" significa que el puerto ya responde HTTP (cualquier código, 401 incluido): Spring Boot abre el
+# puerto al final del arranque, después de Flyway. Sin -f, curl solo falla si no hay conexión.
+x-http-healthcheck: &http-healthcheck
+  interval: 5s
+  timeout: 3s
+  retries: 30
+  start_period: 20s
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: minibank-mysql
+    environment:
+      # Los servicios se conectan como root (DB_USERNAME=root), así que la contraseña es la de root.
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD es obligatoria, ver .env.example}
+    ports:
+      - "${DB_PORT:-3307}:3306"
+    volumes:
+      - minibank-mysqldata:/var/lib/mysql
+      - ./docker/mysql-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Por TCP (127.0.0.1) y no por socket: en el primer arranque MySQL levanta un servidor temporal sin red
+      # que sí responde por socket, y el healthcheck daría "healthy" antes de tiempo.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  config-server:
+    profiles: ["app"]
+    build: ./config-server
+    image: minibank/config-server
+    restart: unless-stopped
+    environment:
+      # config-repo se monta, no se copia en la imagen: un cambio de configuración solo pide reiniciar el servicio.
+      CONFIG_REPO_PATH: /config-repo
+    volumes:
+      - ./config-repo:/config-repo:ro
+    ports:
+      - "8888:8888"
+    healthcheck:
+      <<: *http-healthcheck
+      test: ["CMD", "curl", "-fs", "-o", "/dev/null", "http://localhost:8888/application/default"]
+
+  auth-service:
+    <<: *business-service
+    build: ./auth-service
+    image: minibank/auth-service
+    ports:
+      - "8081:8081"
+    healthcheck:
+      <<: *http-healthcheck
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:8081/"]
+
+  customer-service:
+    <<: *business-service
+    build: ./customer-service
+    image: minibank/customer-service
+    ports:
+      - "8082:8082"
+    healthcheck:
+      <<: *http-healthcheck
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:8082/"]
+
+  account-service:
+    <<: *business-service
+    build: ./account-service
+    image: minibank/account-service
+    ports:
+      - "8083:8083"
+    healthcheck:
+      <<: *http-healthcheck
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:8083/"]
+
+  api-gateway:
+    profiles: ["app"]
+    build: ./api-gateway
+    image: minibank/api-gateway
+    restart: unless-stopped
+    # Sin Config Server el gateway no tiene rutas; espera también a los servicios para no responder 503 al empezar.
+    depends_on:
+      config-server:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      customer-service:
+        condition: service_healthy
+      account-service:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: dev,docker
+      CONFIG_SERVER_URL: http://config-server:8888
+    ports:
+      - "8080:8080"
+    healthcheck:
+      <<: *http-healthcheck
+      test: ["CMD", "curl", "-s", "-o", "/dev/null", "http://localhost:8080/"]
+
+volumes:
+  minibank-mysqldata:

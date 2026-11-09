@@ -196,11 +196,31 @@ erDiagram
 
 ## Arrancar
 
+### Todo en Docker
+
+Requisitos: solo Docker. Un comando construye las cinco imágenes y levanta todo en orden, por healthchecks:
+
+```bash
+cp .env.example .env                                  # una sola vez; cambia JWT_SECRET y DB_PASSWORD
+docker compose --profile app up -d --build --wait     # MySQL, config-server, 3 servicios y gateway
+docker compose --profile app ps                       # todos "healthy"
+scripts/smoke-test.sh                                 # comprobación de punta a punta por el gateway
+```
+
+- Cada proyecto tiene su `Dockerfile` (dos etapas: JDK para compilar, JRE para ejecutar, sin root). La imagen no ejecuta los tests.
+- Los servicios arrancan con los perfiles `dev,docker`. `config-repo/*-docker.properties` cambia `localhost` por los nombres de servicio de Compose (`mysql:3306`, `http://auth-service:8081`...); `dev` carga los datos de prueba.
+- `config-repo/` se monta en el Config Server: tras cambiar un valor, `docker compose restart <servicio>`.
+- Los secretos salen del `.env`, igual que en local.
+- Logs: `docker compose logs -f customer-service auth-service`. Para probar la resiliencia: `docker compose stop auth-service` y `scripts/smoke-test.sh auth-caido`.
+- Parar: `docker compose --profile app down` (con `-v` borra también los datos).
+
+### Desde el IDE o con Maven
+
 Requisitos: Java 21 y Docker.
 
 ```bash
 cp .env.example .env                 # una sola vez; cambia JWT_SECRET y DB_PASSWORD (y DB_PORT si el 3307 está ocupado)
-docker compose up -d                 # MySQL con auth_db, customer_db y account_db
+docker compose up -d                 # solo MySQL con auth_db, customer_db y account_db (sin --profile app)
 ```
 
 Después, en este orden y cada uno en su terminal. Los servicios, con el perfil `dev`:
@@ -260,4 +280,4 @@ scripts/smoke-test.sh auth-caido     # después de parar auth-service: login 503
 
 ## Pendiente
 
-Dockerfile por servicio, Compose con todo el sistema y pipeline de CI, como en las clases 12 y 13 de TaskHub.
+Pipeline de CI, como en la clase 13 de TaskHub, y healthchecks con Actuator (hoy el healthcheck de cada servicio solo comprueba que su puerto responde HTTP).

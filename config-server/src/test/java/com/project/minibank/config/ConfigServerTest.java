@@ -49,6 +49,23 @@ class ConfigServerTest {
         }
     }
 
+    // Perfiles dev,docker (docker compose --profile app): docker es el último, así que gana, y cambia localhost por
+    // los nombres de servicio de Compose; dev sigue aportando los datos de prueba.
+    @Test
+    void theDockerProfileUsesComposeServiceNames() throws Exception {
+        mvc.perform(get("/customer-service/dev,docker"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.propertySources[0].name").value(org.hamcrest.Matchers.endsWith("customer-service-docker.properties")))
+                .andExpect(jsonPath("$.propertySources[0].source['spring.datasource.url']").value("jdbc:mysql://mysql:3306/customer_db"))
+                .andExpect(jsonPath("$.propertySources[0].source['minibank.services.auth-url']").value("http://auth-service:8081"))
+                .andExpect(jsonPath("$.propertySources[*].source['spring.flyway.locations']").value(org.hamcrest.Matchers.hasItem("classpath:db/migration,classpath:db/seed")));
+        for (String service : List.of("auth-service", "account-service", "api-gateway")) {
+            mvc.perform(get("/" + service + "/dev,docker"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.propertySources[0].name").value(org.hamcrest.Matchers.endsWith(service + "-docker.properties")));
+        }
+    }
+
     // Los secretos (JWT_SECRET, DB_PASSWORD) llegan por variables de entorno, nunca desde config-repo.
     @Test
     void theConfigRepoHoldsNoSecrets() throws IOException {
